@@ -1,15 +1,5 @@
-// server/api/createEvent.ts
+// server/api/create-event.ts
 import { createClient } from '@supabase/supabase-js'
-
-
-const FORBIDDEN_KEYWORDS = ["курение", "кальян", "вейп", "наркотики", "алкоголь"];
-const FORBIDDEN_PLACES = ["бар", "клуб", "паб", "рюмочная", "кальянная"];
-const FORBIDDEN_LINKS = ["instagram.com", "facebook.com", "twitter.com"];
-
-const containsForbiddenWords = (text: string, wordList: string[]): boolean => {
-    const lowerCaseText = text.toLowerCase();
-    return wordList.some(word => lowerCaseText.includes(word));
-};
 
 export default defineEventHandler(async (event) => {
 
@@ -18,18 +8,8 @@ export default defineEventHandler(async (event) => {
 
     const body = await readBody(event)
 
-    // Проверка на запрещенные слова
-    const eventText = `${body.event_name} ${body.event_description}`.toLowerCase();
-    const locationText = body.event_location.toLowerCase();
-
-    if (containsForbiddenWords(eventText, FORBIDDEN_KEYWORDS) || containsForbiddenWords(locationText, FORBIDDEN_PLACES)) {
-        setResponseStatus(event, 400);
-        return { error: 'Мероприятие содержит недопустимые слова или относится к запрещенному типу заведения.' };
-    }
-
     const { error } = await supabase.from('events_raw').insert([
         {
-            user_id: body.user_id,
             event_name: body.event_name,
             event_banner: body.event_banner,
             event_start_dttm: body.event_start_dttm,
@@ -47,9 +27,7 @@ export default defineEventHandler(async (event) => {
         }
     ])
 
-    if (error) {
-        return { error: error.message }
-    }
+    if (error) return { error: error.message }
 
     return { success: true }
 })

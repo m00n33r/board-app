@@ -1,15 +1,17 @@
 <script setup lang="ts">
-import { useRouter, useRoute } from "vue-router";
-// 1. Импортируем onActivated
-import { onMounted, onActivated, ref } from "vue";
-import { useWebApp } from "vue-tg";
-import styles from './assets/favorites.module.css';
-import { format } from 'date-fns';
-import { ru } from 'date-fns/locale';
+
 
 definePageMeta({
   layout: 'header-favorites',
 });
+
+
+import {useRouter} from "#vue-router";
+import styles from './assets/favorites.module.css';
+import {onMounted, ref} from "vue";
+import {useWebApp} from "vue-tg";
+import { format } from 'date-fns';
+import { ru } from 'date-fns/locale';
 
 interface Event {
   event_name: string;
@@ -22,15 +24,32 @@ interface Event {
 }
 
 const favorite_events = ref<Event[]>([]);
-const router = useRouter();
+
+// Загружаем карточки при монтировании компонента
+onMounted(() => {
+
+  console.log(getComputedStyle(document.body).fontFamily);
+
+  const {initDataUnsafe} = useWebApp();
+  const userId = initDataUnsafe?.user?.id;
+
+  loadFavorites(userId);
+
+
+});
+
 const route = useRoute();
+const router = useRouter();
 
 const goToEvent = (id: string) => {
+
   router.push({
-    path: `/event/${id}`,
-    query: { from: route.fullPath },
-  });
+        path: `/event/${id}`,
+        query: { from: route.fullPath },
+      }
+  );
 };
+
 
 interface LoadFavoritesResponse {
   data?: Event[]
@@ -42,36 +61,21 @@ const loadFavorites = async (userId) => {
     const response = await $fetch<LoadFavoritesResponse>('/api/loadFavorites', {
       method: 'POST',
       body: { user_id: userId }
-    });
+    })
 
     if (response.error) {
-      console.error('Ошибка при загрузке избранного:', response.error);
-      return;
+      console.error('Ошибка при загрузке избранного:', response.error)
+      return
     }
 
-    favorite_events.value = response.data || [];
+    favorite_events.value = response.data || []
   } catch (err) {
-    console.error('Ошибка запроса избранного:', err);
+    console.error('Ошибка запроса избранного:', err)
   }
 };
 
-// 2. Создаем единую функцию для загрузки данных
-const loadData = () => {
-    const { initDataUnsafe } = useWebApp();
-    const userId = initDataUnsafe?.user?.id;
 
-    if (userId) {
-        loadFavorites(userId);
-    }
-}
-
-// 3. Вызываем загрузку данных при первой загрузке
-onMounted(loadData);
-
-// 4. Вызываем загрузку данных при каждом возвращении на страницу
-onActivated(loadData);
-
-
+// Список сокращённых дней недели
 const shortWeekdays = {
   понедельник: "Пн",
   вторник: "Вт",
@@ -83,21 +87,30 @@ const shortWeekdays = {
 };
 
 const capitalizeMonth = (dateStr: string) => {
-  if (!dateStr) return '';
   const date = new Date(dateStr);
-  const fullWeekday = format(date, "EEEE", { locale: ru });
-  const formattedDate = format(date, "d MMMM", { locale: ru });
+
+  // Получаем полное название дня недели и месяца
+  const fullWeekday = format(date, "EEEE", { locale: ru }); // "понедельник"
+  const formattedDate = format(date, "d MMMM", { locale: ru }); // "1 января"
+
+  // Делаем первую букву месяца заглавной
   const capitalizedMonth = formattedDate.replace(/\s(\p{L})/u, (match) => match.toUpperCase());
+
+  // Получаем сокращённый день недели
   const shortWeekday = shortWeekdays[fullWeekday.toLowerCase()] || fullWeekday;
+
   return `${shortWeekday}, ${capitalizedMonth}`;
 };
+
+
+
+
 </script>
 
 <template>
   <div :class="styles.saved_events_page">
     <div :class="styles.events_container">
       <div
-          v-if="favorite_events.length > 0"
           :class="styles.event_card"
           v-for="(event, index) in favorite_events"
           :key="index"
@@ -108,40 +121,48 @@ const capitalizeMonth = (dateStr: string) => {
         </div>
 
         <div :class="styles.event_details">
+
           <h3 :class="styles.event_name">{{event.event_name}}</h3>
           <p :class="styles.event_host">@{{event.event_host}}</p>
           <div :class="styles.event_meta">
             <div :class="styles.event_date">
-              <span :class="styles.icon"><img src="/icons/Date.svg" /></span>
-              <span :class="styles.icon">{{ capitalizeMonth(event.event_date) }}</span>
-              <span :class="styles.icon" style="margin-left: 8px;"><img src="/icons/Time.svg" /></span>
+              <span :class="styles.icon">
+                <img src="/icons/Date.svg" />
+              </span>
+              <span :class="styles.icon">
+                {{ capitalizeMonth(event.event_date) }}
+              </span>
+              <span :class="styles.icon">
+                <img src="/icons/Time.svg" />
+              </span>
               <span>{{event.event_time}} GMT+3</span>
             </div>
             <div :class="styles.event_location">
-              <span :class="styles.icon"><img src="/icons/Location.svg" /></span>
+              <span :class="styles.icon">
+                <img src="/icons/Location.svg" />
+              </span>
               <span>{{event.event_location}}</span>
             </div>
             <div :class="styles.event_separator"></div>
           </div>
         </div>
       </div>
-       <div v-else>
-        <p>У вас пока нет сохраненных мероприятий.</p>
-      </div>
+
     </div>
   </div>
 </template>
 
 <style scoped>
+
 html, body {
   margin: 0;
   padding: 0;
   height: 100%;
   overflow-x: hidden;
 }
-p {
-  color: var(--tg-theme-hint-color);
-  text-align: center;
-  margin-top: 20px;
-}
+
+
+
 </style>
+
+
