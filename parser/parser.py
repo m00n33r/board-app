@@ -1,41 +1,54 @@
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.by import By
+from selenium.common.exceptions import NoSuchElementException, ElementClickInterceptedException
 from webdriver_manager.chrome import ChromeDriverManager
 from bs4 import BeautifulSoup
 import time
 from supabase_client import get_supabase_client
 
 BASE_URL = "https://afisha.yandex.ru"
+SELECTION_URL = "https://afisha.yandex.ru/moscow/selections/main-show"
 
+def click_show_more(driver, max_clicks=50):
+    clicks = 0
+    while clicks < max_clicks:
+        try:
+            btn = driver.find_element(
+                By.XPATH,
+                "//div[@data-test-id='eventsList.more']//a[contains(@class, 'button-more') and not(contains(@class, 'button-more_hidden_yes'))]"
+            )
+            if btn.is_displayed():
+                driver.execute_script("arguments[0].scrollIntoView(true);", btn)
+                btn.click()
+                clicks += 1
+                time.sleep(2)
+            else:
+                break
+        except (NoSuchElementException, ElementClickInterceptedException):
+            break
 
-def parse_events():
-    url = f"{BASE_URL}/kazan"
+def parse_events_from_selection(selection_url):
     options = webdriver.ChromeOptions()
-    options.add_argument("--disable-blink-features=AutomationControlled")
-    driver = webdriver.Chrome(options=options)
-    driver.get(url)
-    time.sleep(7)
-    driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-    time.sleep(7)
+    # options.add_argument("--headless")  # включить для headless-режима
+    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+    driver.get(selection_url)
+    time.sleep(20)
+    click_show_more(driver)
     html = driver.page_source
-    
-    with open("debug.html", "w", encoding="utf-8") as f:
+    # Сохраняем HTML для отладки
+    with open("debug_main_show.html", "w", encoding="utf-8") as f:
         f.write(html)
-
     driver.quit()
     soup = BeautifulSoup(html, "html.parser")
     events = []
-
-    for card in soup.find_all("div", {"data-test-id": "eventCard.root"}):
-        # Название
+    cards = soup.find_all("div", {"data-test-id": "eventCard.root"})
+    print(f"Найдено карточек: {len(cards)}")
+    for card in cards:
         try:
-            title = card.find(
-                "h2", {"data-test-id": "eventCard.eventInfoTitle"}
-            ).text.strip()
+            title = card.find("h2", {"data-test-id": "eventCard.eventInfoTitle"}).text.strip()
         except AttributeError:
             title = None
-
-        # Дата и время
         try:
             datetime = (
                 card.find("ul", {"data-test-id": "eventCard.eventInfoDetails"})
@@ -44,8 +57,6 @@ def parse_events():
             )
         except AttributeError:
             datetime = None
-
-        # Локация
         try:
             location = (
                 card.find("ul", {"data-test-id": "eventCard.eventInfoDetails"})
@@ -54,30 +65,22 @@ def parse_events():
             )
         except (AttributeError, IndexError):
             location = None
-
-        # Цена
         try:
             price = card.find("span", {"data-test-id": "event-card-price"}).text.strip()
         except AttributeError:
             price = None
-
-        # Ссылка на картинку
         try:
             image_url = card.find("img", class_="jYbobS")["data-src"]
         except (AttributeError, TypeError):
             image_url = None
-
-        # Ссылка на событие
         try:
             link = card.find("a", {"data-test-id": "eventCard.link"})["href"]
             if link and link.startswith("/"):
                 link = BASE_URL + link
         except (AttributeError, TypeError):
             link = None
-
         genre = None
         description = None
-
         events.append(
             {
                 "event_name": title,
@@ -88,25 +91,24 @@ def parse_events():
                 "event_description": description,
                 "event_tag": genre,
                 "event_link": link,
-                "event_approval": None,
-                "event_price_status": None,
                 "event_price": price,
-                "event_visibility": "public",
-                "event_capacity": None,
-                "event_moderation_step": None,
-                "user_id": None,
             }
         )
     return events
 
-
 def save_to_supabase(events):
+    c = 0
     supabase = get_supabase_client()
     for event in events:
-        supabase.table("events_raw").insert(event).execute()
-
+        existing = supabase.table("events_raw").select("id").eq("event_link", event["event_link"]).execute()
+        if not existing.data:
+            supabase.table("events_raw").insert(event).execute()
+            c += 1
+    print(f"Сохранено {c} новых событий в Supabase.")
 
 if __name__ == "__main__":
-    events = parse_events()
+    print(f"Парсим селекцию: {SELECTION_URL}")
+    events = parse_events_from_selection(SELECTION_URL)
+    print(f"Найдено событий: {len(events)}")
     save_to_supabase(events)
-    print(f"Сохранено {len(events)} событий в Supabase.")
+    print("Парсинг и сохранение завершены.")
