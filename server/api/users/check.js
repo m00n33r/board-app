@@ -1,6 +1,10 @@
 import { createClient } from '@supabase/supabase-js'
 
 export default defineEventHandler(async (event) => {
+    // 1. Получаем конфигурацию и создаем клиент Supabase
+    const config = useRuntimeConfig()
+    const supabase = createClient(config.supabaseUrl, config.supabaseKey)
+
     // Чтение данных из тела запроса
     const body = await readBody(event);
     const userId = parseInt(body.userId, 10);
