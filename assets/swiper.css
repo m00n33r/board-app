@@ -114,7 +114,7 @@ html, body {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 150px; /* Делаем кнопки одинакового размера */
+    width: 150px;
     height: 30px;
     transition: background 0.3s ease;
 }
@@ -158,4 +158,44 @@ html, body {
     filter: brightness(0) invert(1); /* Делаем иконку белой */
 }
 
+/* Стили для нового блока кнопок */
+.buttons-container-new {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  margin-top: 10px;
+  margin-bottom: 10px;
+  gap: 20px;
+  /* Расстояние между кнопками */
+}
 
+.button-new {
+  border-radius: 45px;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-weight: 300;
+  font-size: 16px;
+  transition: transform 0.2s ease, background-color 0.2s ease;
+  padding: 20px 30px;
+  min-width: 90px;
+  min-height: 56px;
+}
+
+.button-new:active {
+  transform: scale(0.9);
+}
+
+.button-new.secondary {
+  background-color: rgba(0, 0, 0, 0.3);
+  color: white;
+}
+
+.button-icon {
+  width: 22px;
+  height: 22px;
+  display: block;
+}

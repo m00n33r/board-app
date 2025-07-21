@@ -1,101 +1,71 @@
 <script setup lang="ts">
-
-
-
-import { useWebApp } from 'vue-tg';
-import { ref } from 'vue';
-import { onMounted, onBeforeUnmount } from 'vue';
+import { ref, onMounted, onBeforeUnmount } from 'vue';
 import './assets/styles.css';
+import { useWebApp } from 'vue-tg'; 
 
-
+//
+// --- ВАЖНО: ВЫЗЫВАЕМ ФУНКЦИЮ useWebApp() ЗДЕСЬ ---
+//
+const { initDataUnsafe } = useWebApp();
 
 const isUserChecked = ref(false);
 
-
-
-const checkAndAddUser = async (initDataUnsafe) => {
+const checkAndAddUser = async (data: any) => {
   try {
-
-    const userId = initDataUnsafe?.user?.id;
-    const userFirstName = initDataUnsafe?.user?.first_name;
-    const userLastName = initDataUnsafe?.user?.last_name;
-    const userName = initDataUnsafe?.user?.username;
+    const userId = data?.user?.id;
+    // ... остальной код функции без изменений
+    const userFirstName = data?.user?.first_name;
+    const userLastName = data?.user?.last_name;
+    const userName = data?.user?.username;
     const userCreatedDate = new Date().toISOString().split('T')[0];
 
-    const response = await fetch('/api/users/check', {
+    await fetch('/api/users/check', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        userId: userId,
-        userFirstName: userFirstName,
-        userLastName: userLastName,
-        userName: userName,
-        userCreatedDate: userCreatedDate}),
+        userId,
+        userFirstName,
+        userLastName,
+        userName,
+        userCreatedDate
+      }),
     });
-
-    const result = await response.json();
     isUserChecked.value = true;
-
   } catch (error) {
     console.error('Ошибка при проверке пользователя:', error);
   }
 };
 
-
 onMounted(() => {
-
-  document.documentElement.style.overflow = 'hidden'; // Отключить прокрутку
+  document.documentElement.style.overflow = 'hidden';
   document.body.style.overflow = 'hidden';
-
-  // обработка данных пользователя
-  const {initDataUnsafe, ready} = useWebApp();
-
-  // Уведомляем Telegram, что приложение готово
-  ready();
-
+  
+  // Здесь мы просто используем уже готовые данные
   const userId = initDataUnsafe?.user?.id;
 
   if (userId) {
+    // Передаем initDataUnsafe, а не вызываем useWebApp() заново
     checkAndAddUser(initDataUnsafe);
   } else {
     console.error('User ID не передан Telegram');
   }
-
-
 });
 
-// Восстановить скроллинг при выходе из layout
 onBeforeUnmount(() => {
   document.documentElement.style.overflow = '';
   document.body.style.overflow = '';
 });
-
-
 </script>
 
 <template>
-
   <div>
-
-
     <Header />
-
     <main class="main-content">
-
       <NuxtPage />
-
-
     </main>
-
     <Footer />
-
   </div>
 </template>
 
 <style scoped>
-
-
-
 </style>

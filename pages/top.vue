@@ -80,11 +80,8 @@ const getTrophyIcon = (index: number) => {
 
 
 const goToEvent = (id: string) => {
-  router.push({
-      path: `/event/${id}`,
-        query: { from: route.fullPath }
-  }
-  );
+  if (!id) return;
+  router.push(`/event/${id}`);
 };
 
 

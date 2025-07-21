@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useRouter, useRoute } from "vue-router";
-import { onMounted, onActivated, ref, watch } from "vue";
+import { onMounted, onActivated, ref, watch, computed } from "vue"; // Добавили computed
 import { useWebApp } from "vue-tg";
 import styles from './assets/favorites.module.css'
 
@@ -8,11 +8,13 @@ definePageMeta({
   layout: 'header-favorites',
 });
 
+// Обновленный интерфейс, чтобы он подходил для обеих таблиц
 interface Event {
-  event_id: string;
+  id?: number; // Для events_raw
+  event_id?: string; // Для events
   event_name: string;
   event_banner: string;
-  event_host: string;
+  event_host?: string;
   event_start_dttm: string;
   event_location: string;
   event_moderation_step: string;
@@ -30,6 +32,11 @@ const triggerNotification = () => {
 };
 
 const formatDate = (datetime: string) => {
+
+  if (!datetime) {
+    return { date: 'TBD', time: '' }; // Возвращаем заглушку, если даты нет
+  }
+
   if (!datetime) return { date: '', time: '' };
   const d = new Date(datetime);
   const date = d.toLocaleDateString('ru-RU', { day: '2-digit', month: 'long' });
@@ -49,7 +56,12 @@ const loadMyEvents = async (userId: number) => {
     if (response.error) {
       console.error('Ошибка при загрузке мероприятий:', response.error);
     } else {
-      myEvents.value = (response.data || []).sort((a, b) => new Date(b.event_start_dttm).getTime() - new Date(a.event_start_dttm).getTime());
+      // Сортируем по дате, но сначала обрабатываем event_start_dttm, т.к. в events его нет
+      myEvents.value = (response.data || []).sort((a, b) => {
+        const dateA = a.event_start_dttm ? new Date(a.event_start_dttm).getTime() : 0;
+        const dateB = b.event_start_dttm ? new Date(b.event_start_dttm).getTime() : 0;
+        return dateB - dateA;
+      });
     }
   } catch (err) {
     console.error('Ошибка запроса мероприятий:', err);
@@ -81,11 +93,14 @@ watch(() => route.query, (newQuery) => {
 onMounted(loadData);
 onActivated(loadData);
 
-const goToEvent = (id: string) => {
-  router.push({
-    path: `/event/${id}`,
-    query: { from: route.fullPath },
-  });
+const handleCardClick = (event: Event) => {
+  // Переход только если есть event_id (т.е. событие опубликовано)
+  if (event.event_id) {
+    router.push({
+      path: `/event/${event.event_id}`,
+      query: { from: route.fullPath },
+    });
+  }
 };
 </script>
 
@@ -97,16 +112,15 @@ const goToEvent = (id: string) => {
     
     <div :class="styles.saved_events_page">
       <div :class="styles.events_container">
-
         <div v-if="isLoading">
           <p>Загрузка мероприятий...</p>
         </div>
         <div v-else-if="myEvents.length > 0">
           <div
-            :class="styles.event_card"
             v-for="event in myEvents"
-            :key="event.event_id"
-            @click="goToEvent(event.event_id)">
+            :key="event.event_id || event.id"
+            :class="[styles.event_card, !event.event_id && styles.not_clickable]"
+            @click="handleCardClick(event)">
             
             <div :class="styles.event_image">
               <img v-if="event.event_banner" :src="event.event_banner" alt="Event Banner" />
@@ -126,7 +140,7 @@ const goToEvent = (id: string) => {
                   <span :class="styles.icon"><img src="/icons/Location.svg" /></span>
                   <span>{{ event.event_location }}</span>
                 </div>
-                <div v-if="event.event_moderation_step === 'На модерации'" class="moderation_status">
+                <div v-if="event.event_moderation_step" :class="[styles.moderation_status, event.event_moderation_step === 'Отклонено' && styles.rejected]">
                   {{ event.event_moderation_step }}
                 </div>
               </div>
@@ -142,29 +156,47 @@ const goToEvent = (id: string) => {
   </div>
 </template>
 
-
 <style scoped>
-.moderation_status {
-  background-color: #ffc107;
-  color: #000;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 12px;
-  margin-top: 5px;
-  display: inline-block;
-}
+/* Добавьте эти стили в конец файла /pages/myEvents.vue */
 
 .notification-popup {
   position: fixed;
-  top: 60px; /* Располагаем под хедером */
+  top: 60px;
   left: 50%;
   transform: translateX(-50%);
-  background-color: #4CAF50; /* Зеленый цвет успеха */
+  background-color: #4CAF50;
   color: white;
   padding: 12px 24px;
   border-radius: 8px;
   z-index: 10000;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
   transition: opacity 0.5s, top 0.5s;
+}
+
+.moderation_status {
+  background-color: #ffc107; /* Желтый для модерации */
+  color: #000;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  margin-top: 8px;
+  display: inline-block;
+  font-weight: 500;
+}
+
+.rejected {
+  background-color: #dc3545; /* Красный для отклоненных */
+  color: white;
+}
+
+.not_clickable {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+p {
+  color: var(--tg-theme-hint-color);
+  text-align: center;
+  margin-top: 20px;
 }
 </style>

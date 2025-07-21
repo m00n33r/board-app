@@ -22,6 +22,4 @@ import CustomSwipe from '~/components/SwipeCard.vue'
 
 </template>
 
-<style scoped>
-
-</style>
+<style scoped></style>

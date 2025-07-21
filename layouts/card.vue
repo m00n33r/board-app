@@ -1,66 +1,75 @@
-<script setup lang="ts">
-import { onMounted } from 'vue';
+<template>
+  <div>
+    <NuxtPage />
+  </div>
+</template>
 
-// Проверяем, есть ли Telegram WebApp API
+<script setup lang="ts">
+import { onMounted, onUnmounted } from 'vue';
+import { usePendingFavorite } from '~/composables/usePendingFavorite';
+import { useWebApp } from "vue-tg";
+import { useRouter } from 'vue-router'; 
+
 interface TelegramWebApp {
   WebApp: {
     BackButton: {
       show: () => void;
       hide: () => void;
       onClick: (callback: () => void) => void;
+      offClick: (callback: () => void) => void;
     };
     close: () => void;
-    MainButton: {
-      hide: () => void;
-    };
   };
 }
 
-const route = useRoute();
-const router = useRouter();
+const router = useRouter(); 
+const pendingAction = usePendingFavorite();
+const { initDataUnsafe } = useWebApp();
+
+const handleBackClick = async () => {
+  if (pendingAction.value && pendingAction.value.eventId && pendingAction.value.action) {
+    const userId = initDataUnsafe?.user?.id;
+    if (userId) {
+      const payload = {
+        user_id: userId,
+        event_id: pendingAction.value.eventId,
+        action: pendingAction.value.action,
+      };
+      
+      $fetch('/api/toggleFavorite', {
+        method: 'POST',
+        body: payload
+      }).catch(err => {
+        console.error("Ошибка отложенного сохранения:", err.data || err);
+      });
+    }
+    pendingAction.value = { eventId: null, action: null };
+  }
+
+  // Проверяем, есть ли куда возвращаться в истории
+  if (window.history.state.back) {
+    router.back();
+  } else {
+    // Если истории нет (пришли по прямой ссылке), переходим на главную
+    router.push('/');
+  }
+};
 
 onMounted(() => {
-  if (process.client && (window as any).Telegram?.WebApp) {
-    const tg = (window as any).Telegram.WebApp as TelegramWebApp['WebApp'];
-
+  if (process.client && window.Telegram?.WebApp) {
+    const tg = window.Telegram.WebApp;
     tg.BackButton.show();
-
-    tg.BackButton.onClick(() => {
-
-
-      const eventId = route.params.id; // Достаём id события из роута
-      if (window.history.length > 1) {
-
-        const returnPath = route.query.from || '/'; // Берём путь точки входа
-        console.log(returnPath);
-
-        router.push({ path: (returnPath as string), query: { scrollTo: eventId } });
-
-      } else {
-        tg.close();
-      }
-
-      tg.BackButton.hide();
-
-
-    });
-
-  } else {
-    console.error('Telegram WebApp API недоступен');
+    tg.BackButton.onClick(handleBackClick);
   }
 });
 
+onUnmounted(() => {
+  if (process.client && window.Telegram?.WebApp) {
+    const tg = window.Telegram.WebApp;
+    tg.BackButton.offClick(handleBackClick);
+    tg.BackButton.hide();
+  }
+});
 </script>
 
-
-<template>
-
-  <NuxtPage />
-
-</template>
-
-
-
-<style scoped>
-
-</style>
+<style scoped></style>

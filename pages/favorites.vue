@@ -19,6 +19,7 @@ interface Event {
   event_date: string;
   event_time: string;
   event_location: string;
+  favorites_count: string;
 }
 
 const favorite_events = ref<Event[]>([]);
@@ -83,7 +84,8 @@ const shortWeekdays = {
 };
 
 const capitalizeMonth = (dateStr: string) => {
-  if (!dateStr) return '';
+  if (!dateStr) return 'Дата не указана';
+  
   const date = new Date(dateStr);
   const fullWeekday = format(date, "EEEE", { locale: ru });
   const formattedDate = format(date, "d MMMM", { locale: ru });
