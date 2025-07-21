@@ -1,4 +1,4 @@
-// server/api/load-card-by-id.ts
+// /server/api/loadCardById.ts
 import { createClient } from '@supabase/supabase-js'
 
 export default defineEventHandler(async (event) => {
@@ -6,12 +6,22 @@ export default defineEventHandler(async (event) => {
     const config = useRuntimeConfig()
     const supabase = createClient(config.supabaseUrl, config.supabaseKey)
 
+    // Запрашиваем все поля, включая favorites_count
     const { data, error } = await supabase
         .from('events')
-        .select('event_id, event_name, event_host, event_date, event_time, event_location, event_banner, event_desc')
+        .select('*') // Просто и надежно
         .eq('event_id', id)
         .single()
 
-    if (error) return { error: error.message }
+    if (error) {
+        setResponseStatus(event, 500);
+        return { error: error.message }
+    }
+    
+    // Добавляем защиту на случай, если events_stats будет использоваться где-то еще
+    if (data && !data.events_stats) {
+        data.events_stats = [{ uniq_users_likes: Number(data.favorites_count) || 0 }];
+    }
+
     return { data }
 })

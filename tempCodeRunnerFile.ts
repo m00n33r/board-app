@@ -37,26 +37,9 @@ export default defineNuxtConfig({
     // Переменные, доступные и на клиенте, и на сервере
     public: {
       telegramAppUrl: process.env.NUXT_PUBLIC_TELEGRAM_APP_URL || '',
-    },
-    vite: {
-    server: {
-      host: true, // 0.0.0.0 для внешнего доступа
-      port: 3000,
-    },
   },
+  devServer: {
+    host: '0.0.0.0', // чтобы сервер был доступен извне
+    port: 3000,
   },
-  
-  vite: {
-    server: {
-      // host: true, // В Nuxt это обычно не требуется, но можно оставить
-      allowedHosts: [
-        '.ngrok-free.app',
-        'toboard.org',
-      ],
-      hmr: {
-        clientPort: 443,
-      },
-    },
-  },
-
-  });
+});

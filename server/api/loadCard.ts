@@ -1,59 +1,50 @@
-// server/api/load-card.ts
-import { createClient } from '@supabase/supabase-js'
+// /server/api/loadCard.ts
+import { createClient } from '@supabase/supabase-js';
 
 export default defineEventHandler(async (event) => {
-    const { eventId, direction } = await readBody(event)
-    const config = useRuntimeConfig()
-    const supabase = createClient(config.supabaseUrl, config.supabaseKey)
+  const { eventId, direction } = await readBody(event);
+  const config = useRuntimeConfig();
+  const supabase = createClient(config.supabaseUrl as string, config.supabaseKey as string);
 
-    let query
+  let query;
+  const currentEventId = eventId ? String(eventId) : null;
 
-    if (direction === 'current') {
-        query = supabase
-            .from('events')
-            .select()
-            .eq('event_id', eventId)
-            .limit(1)
-    } else if (direction === 'next') {
-        query = supabase
-            .from('events')
-            .select()
-            .order('event_id', { ascending: true })
-            .gt('event_id', eventId || 0)
-            .limit(1)
-    } else {
-        query = supabase
-            .from('events')
-            .select()
-            .order('event_id', { ascending: false })
-            .lt('event_id', eventId ?? Number.MAX_SAFE_INTEGER)
-            .limit(1)
+  // Теперь мы запрашиваем все поля (*) из таблицы events без лишних соединений
+  const baseQuery = supabase.from('events').select('*');
+
+  if (direction === 'current' && currentEventId) {
+    query = baseQuery.eq('event_id', currentEventId).limit(1);
+  } else if (direction === 'next') {
+    let nextQuery = baseQuery.order('event_id', { ascending: true });
+    if (currentEventId) {
+      nextQuery = nextQuery.gt('event_id', currentEventId);
     }
-
-    const { data, error } = await query.single()
-
-    if (!data && direction === 'next') {
-        // Вернуть первую карточку
-        const { data: fallback } = await supabase
-            .from('events')
-            .select()
-            .order('event_id', { ascending: true })
-            .limit(1)
-            .single()
-
-        return fallback || null
+    query = nextQuery.limit(1);
+  } else { // direction === 'prev'
+    let prevQuery = baseQuery.order('event_id', { ascending: false });
+    if (currentEventId) {
+        prevQuery = prevQuery.lt('event_id', currentEventId);
     }
+    query = prevQuery.limit(1);
+  }
 
-    if (!data && direction === 'prev') {
-        const { data: fallback } = await supabase
-            .from('events')
-            .select()
-            .order('event_id', { ascending: false })
-            .limit(1)
-            .single()
+  const { data, error } = await query.single();
 
-        return fallback || null
-    }
+  if (error && error.code !== 'PGRST116') {
+    console.error('Supabase query error:', error.message);
+    setResponseStatus(event, 500);
+    return null;
+  }
 
-    return data || null
-})
+  // Логика зацикливания остается
+  if (!data && direction === 'next') {
+    const { data: fallback } = await supabase.from('events').select('*').order('event_id', { ascending: true }).limit(1).single();
+    return fallback || null;
+  }
+  if (!data && direction === 'prev' && currentEventId) {
+      const { data: fallback } = await supabase.from('events').select('*').order('event_id', { ascending: false }).limit(1).single();
+      return fallback || null;
+  }
+
+  return data || null;
+});

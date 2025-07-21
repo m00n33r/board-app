@@ -1,3 +1,4 @@
+// /server/api/loadMyEvents.ts
 import { createClient } from '@supabase/supabase-js'
 
 export default defineEventHandler(async (event) => {
@@ -11,8 +12,44 @@ export default defineEventHandler(async (event) => {
     return { error: 'user_id is required' };
   }
 
-  const { data, error } = await supabase.from('events_raw').select('*, event_moderation_step').eq('user_id', user_id);
+  // 1. Сначала получаем user_name, так как он используется как event_host
+  const { data: userData, error: userError } = await supabase
+    .from('users')
+    .select('user_name')
+    .eq('user_id', user_id)
+    .single();
 
-  if (error) return { error: error.message };
-  return { data };
+  if (userError) {
+    return { error: 'Не удалось найти пользователя' };
+  }
+  const userName = userData.user_name;
+
+  // 2. Загружаем опубликованные события из основной таблицы events
+  const { data: publishedEvents, error: publishedError } = await supabase
+    .from('events')
+    .select('*') // `event_id` здесь уже есть
+    .eq('event_host', userName);
+
+  if (publishedError) {
+    return { error: `Ошибка загрузки опубликованных событий: ${publishedError.message}` };
+  }
+  
+  // 3. Загружаем события "на модерации" из временной таблицы events_raw
+  const { data: rawEvents, error: rawError } = await supabase
+    .from('events_raw')
+    .select('*')
+    .eq('user_id', user_id)
+    .in('event_moderation_step', ['На модерации', 'Отклонено']); // Захватим и отклоненные
+
+  if (rawError) {
+    return { error: `Ошибка загрузки событий на модерации: ${rawError.message}` };
+  }
+
+  // 4. Объединяем результаты
+  const allMyEvents = [
+    ...(publishedEvents || []),
+    ...(rawEvents || [])
+  ];
+
+  return { data: allMyEvents };
 });
