@@ -17,9 +17,11 @@
         </div>
 
         <div class="event-desc" v-if="currentCard.event_date">
-          {{ currentCard.event_weekday }}, {{ format(new Date(currentCard.event_date), "d MMMM", { locale: ru }) }},
+          {{ currentCard.event_weekday }}, {{ format(parse(currentCard.event_date, 'yyyy-MM-dd', new Date()), "d MMMM",
+            { locale: ru }) }},
           {{ currentCard.event_time }} GMT+3
         </div>
+        
         <div class="event-desc">{{ currentCard.event_location }}</div>
 
         <div class="buttons-container-new">
@@ -45,10 +47,11 @@
 import { ref, computed, onMounted } from 'vue';
 import './assets/swiper.css';
 import { useWebApp } from "vue-tg";
-import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { useCardBackground } from '~/composables/useCardBackground';
 import { useRouter, useRoute } from 'vue-router';
+import { format, parse } from 'date-fns';
+
 
 
 interface Event {
