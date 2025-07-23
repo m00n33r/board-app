@@ -16,12 +16,6 @@
           <div class="event-likes">{{ formattedLikes }} сохранили</div>
         </div>
 
-        <div class="event-desc" v-if="currentCard.event_date">
-          {{ currentCard.event_weekday }}, {{ format(parse(currentCard.event_date, 'yyyy-MM-dd', new Date()), "d MMMM",
-            { locale: ru }) }},
-          {{ currentCard.event_time }} GMT+3
-        </div>
-        
         <div class="event-desc">{{ currentCard.event_location }}</div>
 
         <div class="buttons-container-new">
