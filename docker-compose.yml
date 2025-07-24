@@ -1,0 +1,31 @@
+# Указываем версию синтаксиса Docker Compose
+version: '3.8'
+
+# Определяем наши сервисы (контейнеры)
+services:
+
+  # Сервис №1: Веб-приложение Nuxt
+  web:
+    build:
+      # Указываем, где искать Dockerfile (в текущей папке - ".")
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      # Пробрасываем порт 3000 из контейнера на ваш компьютер,
+      # чтобы вы могли открыть сайт в браузере по localhost:3000
+      - "3000:3000"
+    env_file:
+      # Подключаем файл с переменными окружения
+      - .env
+    restart: unless-stopped
+
+  # Сервис №2: Telegram-бот
+  bot:
+    build:
+      # Указываем, что Dockerfile для этого сервиса лежит в папке ./telegram_bot
+      context: ./telegram_bot
+      dockerfile: Dockerfile
+    env_file:
+      # Бот тоже будет использовать переменные из этого файла
+      - .env
+    restart: unless-stopped
