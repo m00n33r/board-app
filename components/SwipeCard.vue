@@ -16,13 +16,19 @@
           <div class="event-likes">{{ formattedLikes }} сохранили</div>
         </div>
 
+        <div class="event-desc" v-if="currentCard.event_date">
+          {{ currentCard.event_weekday }}, {{ format(parse(currentCard.event_date, 'yyyy-MM-dd', new Date()), "d MMMM",
+            { locale: ru }) }},
+          {{ currentCard.event_time }} GMT+3
+        </div>
+
         <div class="event-desc">{{ currentCard.event_location }}</div>
 
         <div class="buttons-container-new">
           <button class="button-new secondary" @click.stop="swipeCard('left')">
             Скип
           </button>
-          <button class="button-new secondary" @click.stop="backEvent()"> <img src="public/icons/back_button.svg"
+          <button class="button-new secondary" @click.stop="backEvent()"> <img src="/icons/back_button.svg"
               alt="Назад" class="button-icon" />
           </button>
           <button class="button-new secondary" @click.stop="swipeCard('right')">
@@ -211,10 +217,18 @@ const endDrag = () => {
 };
 
 const route = useRoute();
+
 onMounted(async () => {
   document.body.style.overflow = 'hidden';
   const initialEventId = (route.query.scrollTo as string) || localStorage.getItem('last_event_id');
   await initCards(initialEventId);
+
+if (currentCard.value) {
+    console.log('ПОЛУЧЕННАЯ ДАТА:', currentCard.value.event_date);
+  } else {
+    console.log('Карточка (currentCard) не загрузилась, проверьте API.');
+  }
+
   if (currentCard.value && currentCard.value.event_banner) {
     dominantColor.value = await getAverageColor(currentCard.value.event_banner) as { r: number, g: number, b: number };
     gradientBackgroundColor.value = await gradientBackground();
