@@ -52,6 +52,7 @@ export default defineNuxtConfig({
       allowedHosts: [
         '.ngrok-free.app',
         'toboard.org',
+        'tunnel.toboard.org',
       ],
       hmr: {
         clientPort: 443,
