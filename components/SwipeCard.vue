@@ -28,8 +28,8 @@
           <button class="button-new secondary" @click.stop="swipeCard('left')">
             Скип
           </button>
-          <button class="button-new secondary" @click.stop="backEvent()"> <img src="/icons/back_button.svg"
-              alt="Назад" class="button-icon" />
+          <button class="button-new secondary" @click.stop="backEvent()"> <img src="/icons/back_button.svg" alt="Назад"
+              class="button-icon" />
           </button>
           <button class="button-new secondary" @click.stop="swipeCard('right')">
             Иду
@@ -223,7 +223,7 @@ onMounted(async () => {
   const initialEventId = (route.query.scrollTo as string) || localStorage.getItem('last_event_id');
   await initCards(initialEventId);
 
-if (currentCard.value) {
+  if (currentCard.value) {
     console.log('ПОЛУЧЕННАЯ ДАТА:', currentCard.value.event_date);
   } else {
     console.log('Карточка (currentCard) не загрузилась, проверьте API.');
