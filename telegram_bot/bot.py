@@ -21,6 +21,46 @@ supabase: Client = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_
 # --- Состояния для диалога ---
 WAITING_REASON = 0
 
+# --- Причины отклонения ---
+REJECTION_REASONS = {
+    'content_quality': {
+        'name': '📝 Качество контента',
+        'reasons': [
+            ('Нецензурная лексика', 'Нецензурная лексика в названии или описании'),
+            ('Неподходящая фотография', 'Фотография не соответствует содержанию или правилам'),
+            ('Низкое качество изображения', 'Изображение слишком размытое или некачественное'),
+            ('Неинформативное описание', 'Описание слишком краткое или неинформативное')
+        ]
+    },
+    'event_info': {
+        'name': 'ℹ️ Информация о событии',
+        'reasons': [
+            ('Неполная информация', 'Отсутствует важная информация о событии'),
+            ('Неточные данные', 'Данные о времени, месте или цене неточны'),
+            ('Отсутствует важная информация', 'Не указано время, место или контакты'),
+            ('Противоречивые сведения', 'Информация противоречит сама себе')
+        ]
+    },
+    'technical': {
+        'name': '🔧 Технические проблемы',
+        'reasons': [
+            ('Нерабочие ссылки', 'Ссылки на мероприятие не работают'),
+            ('Недоступные изображения', 'Изображения не загружаются'),
+            ('Ошибки в формате данных', 'Неправильный формат даты, времени или цены'),
+            ('Дублирование контента', 'Событие уже существует на платформе')
+        ]
+    },
+    'policy': {
+        'name': '📋 Правила и политика',
+        'reasons': [
+            ('Нарушение правил платформы', 'Событие не соответствует правилам платформы'),
+            ('Неподходящий контент', 'Контент не подходит для аудитории'),
+            ('Спам или реклама', 'Событие является рекламой или спамом'),
+            ('Нарушение авторских прав', 'Использован контент без разрешения')
+        ]
+    }
+}
+
 def is_image_url(url: str) -> bool:
     """
     Проверяет, заканчивается ли url на типичное расширение картинки.
@@ -96,7 +136,18 @@ async def show_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Показывает статистику по мероприятиям."""
     pending_res = supabase.from_("events_raw").select("id", count='exact').eq("event_moderation_step", "На модерации").execute()
     active_res = supabase.from_("events").select("event_id", count='exact').execute()
-    await update.message.reply_text(f"🔍 Статистика:\n\n- Ожидают модерации: {pending_res.count}\n- Активных событий: {active_res.count}")
+    
+    # Получаем статистику по причинам отклонения
+    rejection_stats = await get_rejection_reasons_stats()
+    
+    stats_text = f"🔍 Статистика:\n\n- Ожидают модерации: {pending_res.count}\n- Активных событий: {active_res.count}"
+    
+    if rejection_stats:
+        stats_text += "\n\n📊 Топ причин отклонения:\n"
+        for i, (reason, count) in enumerate(rejection_stats[:5], 1):
+            stats_text += f"{i}. {reason}: {count}\n"
+    
+    await update.message.reply_text(stats_text)
 
 async def toggle_moderation_mode(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Включает или выключает режим непрерывной модерации."""
@@ -118,6 +169,48 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     
+    # Проверяем, является ли это выбором категории
+    if query.data.startswith('category_'):
+        # Формат: category_eventId_categoryKey
+        parts = query.data.split('_')
+        event_id = int(parts[1])
+        category_key = parts[2]
+        
+        # Показываем причины для выбранной категории
+        await show_reasons_for_category(query, event_id, category_key, context)
+        return
+    
+    # Проверяем, является ли это выбором конкретной причины
+    elif query.data.startswith('reason_'):
+        # Формат: reason_eventId_categoryKey_reasonIndex
+        parts = query.data.split('_')
+        event_id = int(parts[1])
+        category_key = parts[2]
+        reason_index = int(parts[3])
+        
+        # Получаем причину и отклоняем событие
+        reason = REJECTION_REASONS[category_key]['reasons'][reason_index][0]
+        await reject_event_with_reason(query, event_id, reason, context)
+        return
+    
+    # Проверяем, является ли это запросом на ручной ввод причины
+    elif query.data.startswith('manual_reason_'):
+        # Формат: manual_reason_eventId
+        event_id = int(query.data.split('_')[2])
+        context.user_data['event_to_reject'] = event_id
+        
+        # Запрашиваем ручной ввод причины
+        text_for_reason = "✍️ Напишите причину отклонения одним сообщением:"
+        is_photo_message = bool(query.message.photo)
+        
+        if is_photo_message:
+            await query.edit_message_caption(caption=text_for_reason, reply_markup=None)
+        else:
+            await query.edit_message_text(text=text_for_reason, reply_markup=None)
+        
+        return WAITING_REASON
+    
+    # Обработка стандартных действий approve/reject
     action, event_id_str = query.data.split('_')
     event_id = int(event_id_str)
 
@@ -152,14 +245,96 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif action == "reject":
         context.user_data['event_to_reject'] = event_id
         
+        # Создаем клавиатуру с причинами отклонения
+        keyboard = []
+        
+        # Добавляем категории причин
+        for category_key, category_data in REJECTION_REASONS.items():
+            keyboard.append([InlineKeyboardButton(
+                category_data['name'], 
+                callback_data=f"category_{event_id}_{category_key}"
+            )])
+        
+        # Добавляем кнопку для ручного ввода причины
+        keyboard.append([InlineKeyboardButton(
+            "✍️ Другая причина", 
+            callback_data=f"manual_reason_{event_id}"
+        )])
+        
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
         # Редактируем подпись или текст в зависимости от типа сообщения
-        text_for_reason = "✍️ Напишите причину отклонения одним сообщением."
+        text_for_reason = "🚫 Выберите причину отклонения:"
         if is_photo_message:
-            await query.edit_message_caption(caption=text_for_reason, reply_markup=None)
+            await query.edit_message_caption(caption=text_for_reason, reply_markup=reply_markup)
         else:
-            await query.edit_message_text(text=text_for_reason, reply_markup=None)
+            await query.edit_message_text(text=text_for_reason, reply_markup=reply_markup)
             
         return WAITING_REASON
+
+# --- Функции для работы с причинами отклонения ---
+async def show_reasons_for_category(query, event_id: int, category_key: str, context: ContextTypes.DEFAULT_TYPE):
+    """Показывает список причин для выбранной категории."""
+    category_data = REJECTION_REASONS[category_key]
+    
+    # Создаем клавиатуру с причинами
+    keyboard = []
+    for i, (reason_name, reason_desc) in enumerate(category_data['reasons']):
+        keyboard.append([InlineKeyboardButton(
+            reason_name, 
+            callback_data=f"reason_{event_id}_{category_key}_{i}"
+        )])
+    
+    # Добавляем кнопку "Назад"
+    keyboard.append([InlineKeyboardButton(
+        "⬅️ Назад к категориям", 
+        callback_data=f"reject_{event_id}"
+    )])
+    
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    # Обновляем сообщение
+    text = f"🚫 {category_data['name']}\n\nВыберите конкретную причину:"
+    is_photo_message = bool(query.message.photo)
+    
+    if is_photo_message:
+        await query.edit_message_caption(caption=text, reply_markup=reply_markup)
+    else:
+        await query.edit_message_text(text=text, reply_markup=reply_markup)
+
+async def reject_event_with_reason(query, event_id: int, reason: str, context: ContextTypes.DEFAULT_TYPE):
+    """Отклоняет событие с указанной причиной."""
+    try:
+        res = supabase.rpc('reject_event', {'raw_event_id': event_id, 'reason': reason}).execute()
+        
+        # Уведомляем организатора
+        if res.data and res.data[0].get('organizer_user_id'):
+            await context.bot.send_message(
+                res.data[0]['organizer_user_id'], 
+                f'К сожалению, ваше мероприятие отклонено.\nПричина: "{reason}"'
+            )
+        
+        # Обновляем сообщение
+        text = f"🚫 Мероприятие отклонено.\nПричина: {reason}\nОрганизатор уведомлен."
+        is_photo_message = bool(query.message.photo)
+        
+        if is_photo_message:
+            await query.edit_message_caption(caption=text, reply_markup=None)
+        else:
+            await query.edit_message_text(text=text, reply_markup=None)
+            
+    except Exception as e:
+        logging.error(f"Ошибка при отклонении события {event_id}: {e}")
+        error_text = f"❌ Произошла ошибка при отклонении: {e}"
+        is_photo_message = bool(query.message.photo)
+        
+        if is_photo_message:
+            await query.edit_message_caption(caption=error_text, reply_markup=None)
+        else:
+            await query.edit_message_text(text=error_text, reply_markup=None)
+    
+    # Отправляем следующее событие на модерацию
+    await send_next_event_for_moderation(query.message.chat_id, context)
 
 
 async def get_rejection_reason(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -182,6 +357,29 @@ async def cancel_conversation(update: Update, context: ContextTypes.DEFAULT_TYPE
     context.user_data.clear()
     await update.message.reply_text("Действие отменено. Вы все еще в режиме модерации.")
     return ConversationHandler.END
+
+async def get_rejection_reasons_stats():
+    """Получает статистику по причинам отклонения."""
+    try:
+        # Получаем все отклоненные события с причинами
+        res = supabase.from_("events_raw").select("rejection_reason").eq("event_moderation_step", "Отклонено").execute()
+        
+        if not res.data:
+            return []
+        
+        # Подсчитываем частоту каждой причины
+        reason_counts = {}
+        for event in res.data:
+            reason = event.get('rejection_reason', 'Не указана')
+            reason_counts[reason] = reason_counts.get(reason, 0) + 1
+        
+        # Сортируем по частоте
+        sorted_reasons = sorted(reason_counts.items(), key=lambda x: x[1], reverse=True)
+        return sorted_reasons
+        
+    except Exception as e:
+        logging.error(f"Ошибка при получении статистики отклонений: {e}")
+        return []
 
 def main():
     application = Application.builder().token(TELEGRAM_TOKEN).build()
