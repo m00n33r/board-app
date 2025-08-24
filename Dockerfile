@@ -11,12 +11,11 @@ COPY package.json pnpm-lock.yaml ./
 # Устанавливаем зависимости с помощью pnpm
 RUN npm install -g pnpm && pnpm install --frozen-lockfile
 
-# Копируем все остальные файлы проекта
+# Копируем все остальные файлы проекта (кроме node_modules)
 COPY . .
 
 # Собираем Nuxt-приложение для продакшена
 RUN pnpm nuxt build
-
 
 # --- Этап 2: Запуск приложения (Production Stage) ---
 # Начинаем с чистого и такого же легковесного образа
@@ -27,8 +26,11 @@ WORKDIR /app
 
 # Копируем только собранные артефакты из этапа сборки
 COPY --from=build /app/.output ./.output
-# Копируем node_modules, необходимые для запуска сервера
-COPY --from=build /app/node_modules ./node_modules
+# Копируем package.json и pnpm-lock.yaml для установки только production зависимостей
+COPY --from=build /app/package.json ./
+COPY --from=build /app/pnpm-lock.yaml ./
+# Устанавливаем только production зависимости
+RUN npm install -g pnpm && pnpm install --prod --frozen-lockfile
 
 # Устанавливаем переменные окружения для продакшена
 # HOST 0.0.0.0 обязателен, чтобы приложение было доступно извне контейнера
