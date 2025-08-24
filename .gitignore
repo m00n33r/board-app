@@ -24,4 +24,4 @@ logs
 !.env.example
 
 # Project exclude paths
-/content/Events.d.ts
+/content/Events.d.tstelegram_bot/__pycache__/
