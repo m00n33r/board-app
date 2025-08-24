@@ -1,27 +1,11 @@
-# Логи
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-
-# Системные файлы
-.DS_Store
-
-# Папки зависимостей и сборок
+# Минимальный .dockerignore для Timeweb.cloud
 node_modules
-.output
-.nuxt
-dist
-
-# Файлы Docker
-Dockerfile
-.dockerignore
-
-# Файлы git
 .git
 .gitignore
-
-# Переменные окружения - УБИРАЕМ ЭТУ СТРОКУ!
-# .env
+README.md
+*.md
+.env.example
+.env.local
+.env.development
+.env.test
+.env.production
