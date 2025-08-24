@@ -21,6 +21,9 @@ RUN pnpm nuxt build
 # Начинаем с чистого и такого же легковесного образа
 FROM node:18-alpine
 
+# Устанавливаем wget для healthcheck
+RUN apk add --no-cache wget
+
 # Устанавливаем рабочую директорию
 WORKDIR /app
 
@@ -40,6 +43,12 @@ ENV PORT=3000
 
 # Сообщаем Docker, что приложение слушает порт 3000
 EXPOSE 3000
+
+# Создаем пользователя для безопасности
+RUN addgroup -g 1001 -S nodejs
+RUN adduser -S nuxt -u 1001
+RUN chown -R nuxt:nodejs /app
+USER nuxt
 
 # Команда для запуска Nuxt-сервера
 CMD ["node", ".output/server/index.mjs"]
