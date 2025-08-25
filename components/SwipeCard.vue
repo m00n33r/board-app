@@ -44,13 +44,18 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import './assets/swiper.css';
 import { useWebApp } from "vue-tg";
 import { ru } from 'date-fns/locale';
 import { useCardBackground } from '~/composables/useCardBackground';
 import { useRouter, useRoute } from 'vue-router';
 import { format, parse } from 'date-fns';
+
+// Пропсы для получения отфильтрованных событий
+const props = defineProps<{
+  filteredEvents?: any[];
+}>();
 
 
 
@@ -131,10 +136,10 @@ const swipeCard = async (direction: 'left' | 'right') => {
   try {
     const { initDataUnsafe } = useWebApp();
     const user_id = initDataUnsafe?.user?.id;
-    if (!user_id) {
-      console.error('Ошибка: нет user_id');
-      return;
-    }
+    // if (!user_id) {
+    //   console.error('Ошибка: нет user_id');
+    //   return;
+    // }
 
     // Сохраняем "лайк" только при свайпе вправо
     if (direction === 'right') {
@@ -158,12 +163,24 @@ const swipeCard = async (direction: 'left' | 'right') => {
   previousCard.value = currentCard.value;
   currentCard.value = nextCard.value;
 
-  if (currentCard.value) {
-    nextCard.value = await loadCard(currentCard.value.event_id, 'next');
-    if (currentCard.value.event_banner) {
-      dominantColor.value = await getAverageColor(currentCard.value.event_banner) as { r: number, g: number, b: number };
-      gradientBackgroundColor.value = await gradientBackground();
+  // Если есть отфильтрованные события, работаем с ними
+  if (props.filteredEvents && props.filteredEvents.length > 0) {
+    const currentIndex = props.filteredEvents.findIndex(event => event.event_id === currentCard.value?.event_id);
+    if (currentIndex !== -1 && currentIndex < props.filteredEvents.length - 1) {
+      nextCard.value = props.filteredEvents[currentIndex + 1];
+    } else {
+      nextCard.value = null;
     }
+  } else {
+    // Если нет отфильтрованных событий, используем стандартную логику
+    if (currentCard.value) {
+      nextCard.value = await loadCard(currentCard.value.event_id, 'next');
+    }
+  }
+
+  if (currentCard.value && currentCard.value.event_banner) {
+    dominantColor.value = await getAverageColor(currentCard.value.event_banner) as { r: number, g: number, b: number };
+    gradientBackgroundColor.value = await gradientBackground();
   }
 };
 
@@ -218,6 +235,50 @@ const endDrag = () => {
 
 const route = useRoute();
 
+// Следим за изменением отфильтрованных событий
+watch(() => props.filteredEvents, (newEvents) => {
+  if (newEvents && newEvents.length > 0) {
+    // Если есть отфильтрованные события, инициализируем карточки
+    initCardsFromFiltered(newEvents);
+  } else if (newEvents && newEvents.length === 0) {
+    // Если событий нет, очищаем текущие карточки
+    currentCard.value = null;
+    nextCard.value = null;
+    previousCard.value = null;
+  }
+}, { deep: true, immediate: true });
+
+// Функция для инициализации карточек из отфильтрованных событий
+const initCardsFromFiltered = (events: any[]) => {
+  if (events.length === 0) return;
+  
+  // Устанавливаем первую карточку
+  currentCard.value = events[0];
+  
+  // Устанавливаем следующую карточку, если есть
+  if (events.length > 1) {
+    nextCard.value = events[1];
+  } else {
+    nextCard.value = null;
+  }
+  
+  // Предыдущей карточки нет при инициализации
+  previousCard.value = null;
+  
+  // Обновляем фон для текущей карточки
+  if (currentCard.value && currentCard.value.event_banner) {
+    updateCardBackground();
+  }
+};
+
+// Функция для обновления фона карточки
+const updateCardBackground = async () => {
+  if (currentCard.value && currentCard.value.event_banner) {
+    dominantColor.value = await getAverageColor(currentCard.value.event_banner) as { r: number, g: number, b: number };
+    gradientBackgroundColor.value = await gradientBackground();
+  }
+};
+
 onMounted(async () => {
   document.body.style.overflow = 'hidden';
   const initialEventId = (route.query.scrollTo as string) || localStorage.getItem('last_event_id');
@@ -245,7 +306,7 @@ const goToEvent = (id: string) => {
 
 <style scoped>
 .loading-container {
-  color: white;
+  color: rgb(255, 255, 255);
   text-align: center;
   padding-top: 50%;
 }

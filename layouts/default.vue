@@ -59,7 +59,6 @@ onBeforeUnmount(() => {
 
 <template>
   <div>
-    <Header />
     <main class="main-content">
       <NuxtPage />
     </main>
