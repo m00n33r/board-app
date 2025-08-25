@@ -100,7 +100,7 @@ onMounted(() => {
   flex-shrink: 0;
   white-space: nowrap;
   font-weight: 700;
-  background-color: #ffffff;
+  background-color: #f2f2f7;
   font-size: 14px;
   border: none;
 }
@@ -117,7 +117,7 @@ onMounted(() => {
 }
 
 .tags-container .tag-button:first-child.active {
-  background-color: #a4a4a4;
+    background-color: #f2f2f7;
   color: #000;
   border: none;
 }
