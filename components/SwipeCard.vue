@@ -131,10 +131,10 @@ const swipeCard = async (direction: 'left' | 'right') => {
   try {
     const { initDataUnsafe } = useWebApp();
     const user_id = initDataUnsafe?.user?.id;
-    if (!user_id) {
-      console.error('Ошибка: нет user_id');
-      return;
-    }
+    // if (!user_id) {
+    //   console.error('Ошибка: нет user_id');
+    //   return;
+    // }
 
     // Сохраняем "лайк" только при свайпе вправо
     if (direction === 'right') {
