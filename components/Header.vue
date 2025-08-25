@@ -69,41 +69,62 @@ const selectedDates = ref<string[]>([]);
 
 // Функция для выбора/отмены выбора даты
 const selectDate = (day: string) => {
+  console.log('Клик по дате:', day);
+  console.log('Текущие выбранные даты:', selectedDates.value);
+  
   const index = selectedDates.value.indexOf(day);
   if (index > -1) {
     // Если дата уже выбрана - убираем её
     selectedDates.value.splice(index, 1);
+    console.log('Дата убрана:', day);
   } else {
     // Если дата не выбрана - добавляем её
     selectedDates.value.push(day);
+    console.log('Дата добавлена:', day);
   }
+  
+  console.log('Новые выбранные даты:', selectedDates.value);
 };
 
 // Функция для запроса в БД по выбранным датам
 const fetchEventsByDates = async () => {
-  if (selectedDates.value.length === 0) {
-    // Если даты не выбраны, загружаем все события
-    console.log('Загружаем все события...');
-    // Здесь должен быть ваш API запрос для загрузки всех событий
-    return;
-  }
-  
-  console.log('Загружаем события по датам:', selectedDates.value);
-  
   try {
-    // Здесь должен быть ваш API запрос с фильтром по датам
-    // const events = await $fetch('/api/events', { 
-    //   params: { dates: selectedDates.value } 
-    // });
+    // Получаем ISO даты для фильтрации
+    const isoDates = dates.value
+      .filter(date => selectedDates.value.includes(date.day))
+      .map(date => date.iso);
     
-    // Заглушка для демонстрации
-    const events = []; // Здесь будут реальные события из БД
+    if (selectedDates.value.length === 0) {
+      // Если даты не выбраны, загружаем все события
+      console.log('Загружаем все события...');
+      emit('events-found', {
+        events: [],
+        dates: [],
+        count: 0,
+        showAll: true
+      });
+      return;
+    }
+    
+    console.log('Загружаем события по датам:', isoDates);
+    
+    // API запрос с фильтром по датам
+    const response = await $fetch<{ data?: any[], error?: string }>('/api/loadEventsByDates', {
+      method: 'POST',
+      body: { dates: isoDates }
+    });
+    
+    if (response.error) {
+      throw new Error(response.error);
+    }
+    
+    const events = response.data || [];
     
     if (events.length === 0) {
       // Если событий нет, показываем сообщение
       console.log('В выбранные даты событий нет');
       emit('no-events-found', {
-        message: `В выбранные даты (${selectedDates.value.join(', ')}) событий нет`,
+        message: `В выбранные даты (${selectedDates.value.join(', ')}) мероприятий нет :(`,
         dates: selectedDates.value
       });
     } else {
@@ -111,7 +132,8 @@ const fetchEventsByDates = async () => {
       emit('events-found', {
         events: events,
         dates: selectedDates.value,
-        count: events.length
+        count: events.length,
+        showAll: false
       });
     }
   } catch (error) {

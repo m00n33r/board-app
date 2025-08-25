@@ -19,7 +19,7 @@ export default defineEventHandler(async (event) => {
       });
     }
 
-    console.log('Загружено тегов:', tags?.length || 0);
+    // console.log('Загружено тегов:', tags?.length || 0);
     return tags || [];
 
   } catch (error) {
